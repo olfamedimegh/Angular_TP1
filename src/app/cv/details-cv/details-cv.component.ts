@@ -5,15 +5,21 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { APP_ROUTES } from '../../../config/routes.config';
 import { AuthService } from '../../auth/services/auth.service';
-
-import { DefaultImagePipe } from '../pipes/default-image.pipe';
+import { catchError, EMPTY, Observable } from 'rxjs';
+import {DefaultImagePipe} from "../pipes/default-image.pipe";
+import {AsyncPipe, NgIf} from "@angular/common";
+import {LoggerService} from "../../services/logger.service";
 
 @Component({
-    selector: 'app-details-cv',
-    templateUrl: './details-cv.component.html',
-    styleUrls: ['./details-cv.component.css'],
-    standalone: true,
-    imports: [DefaultImagePipe],
+  selector: 'app-details-cv',
+  templateUrl: './details-cv.component.html',
+  styleUrls: ['./details-cv.component.css'],
+  imports: [
+    DefaultImagePipe,
+    AsyncPipe,
+    NgIf
+  ],
+  standalone: true
 })
 export class DetailsCvComponent implements OnInit {
   private cvService = inject(CvService);
@@ -22,7 +28,7 @@ export class DetailsCvComponent implements OnInit {
   private toastr = inject(ToastrService);
   authService = inject(AuthService);
 
-  cv: Cv | null = null;
+  cv$: Observable<Cv> | null = null;
 
   /** Inserted by Angular inject() migration for backwards compatibility */
   constructor(...args: unknown[]);
@@ -30,26 +36,30 @@ export class DetailsCvComponent implements OnInit {
 
   ngOnInit() {
     const id = this.activatedRoute.snapshot.params['id'];
-    this.cvService.getCvById(+id).subscribe({
-        next: (cv) => {
-          this.cv = cv;
-        },
-        error: (e) => {
+    this.cv$ = this.cvService.getCvById(+id).pipe(
+      catchError(
+        (e) => {
           this.router.navigate([APP_ROUTES.cv]);
-        },
-      });
+          return EMPTY;
+        }
+      )
+    );
   }
+
   deleteCv(cv: Cv) {
-    this.cvService.deleteCvById(cv.id).subscribe({
-      next: () => {
-        this.toastr.success(`${cv.name} supprimé avec succès`);
-        this.router.navigate([APP_ROUTES.cv]);
-      },
-      error: () => {
+    this.cvService.deleteCvById(cv.id).pipe(
+      catchError( (e) => {
         this.toastr.error(
           `Problème avec le serveur veuillez contacter l'admin`
         );
-      },
-    });
-  }
+        return EMPTY;
+      }))
+      .subscribe({
+        next: () => {
+          this.toastr.success(`${cv.name} supprimé avec succès`);
+          this.router.navigate([APP_ROUTES.cv]);
+        },
+      });
+  };
 }
+

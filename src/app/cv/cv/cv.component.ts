@@ -3,30 +3,32 @@ import { Cv } from "../model/cv";
 import { LoggerService } from "../../services/logger.service";
 import { ToastrService } from "ngx-toastr";
 import { CvService } from "../services/cv.service";
-import { ListComponent } from "../list/list.component";
-import { CvCardComponent } from "../cv-card/cv-card.component";
-import { EmbaucheComponent } from "../embauche/embauche.component";
-import { UpperCasePipe, DatePipe } from "@angular/common";
+import { catchError, Observable, of } from "rxjs";
+import {ListComponent} from "../list/list.component";
+import {CvCardComponent} from "../cv-card/cv-card.component";
+import {AsyncPipe, DatePipe, UpperCasePipe} from "@angular/common";
+import {EmbaucheComponent} from "../embauche/embauche.component";
 @Component({
-    selector: "app-cv",
-    templateUrl: "./cv.component.html",
-    styleUrls: ["./cv.component.css"],
-    standalone: true,
-    imports: [
-        ListComponent,
-        CvCardComponent,
-        EmbaucheComponent,
-        UpperCasePipe,
-        DatePipe,
-    ],
+  selector: "app-cv",
+  templateUrl: "./cv.component.html",
+  styleUrls: ["./cv.component.css"],
+  imports: [
+    ListComponent,
+    CvCardComponent,
+    DatePipe,
+    AsyncPipe,
+    UpperCasePipe,
+    EmbaucheComponent
+  ],
+  standalone: true
 })
 export class CvComponent {
   private logger = inject(LoggerService);
   private toastr = inject(ToastrService);
   private cvService = inject(CvService);
 
-  cvs: Cv[] = [];
-  selectedCv: Cv | null = null;
+  cvs: Observable<Cv[]>;
+  selectedCv: Observable<Cv> | null = null;
   /*   selectedCv: Cv | null = null; */
   date = new Date();
 
@@ -34,19 +36,17 @@ export class CvComponent {
   constructor(...args: unknown[]);
 
   constructor() {
-    this.cvService.getCvs().subscribe({
-      next: (cvs) => {
-        this.cvs = cvs;
-      },
-      error: () => {
-        this.cvs = this.cvService.getFakeCvs();
+    // Ajouter catchErrror dans la pipe
+    this.cvs =  this.cvService.getCvs().pipe(
+      catchError( (e) => {
+        console.log('we are in error');
         this.toastr.error(`
           Attention!! Les données sont fictives, problème avec le serveur.
           Veuillez contacter l'admin.`);
-      },
-    });
-    this.logger.logger("je suis le cvComponent");
+        return of(this.cvService.getFakeCvs());
+      })
+    );
     this.toastr.info("Bienvenu dans notre CvTech");
-    this.cvService.selectCv$.subscribe((cv) => (this.selectedCv = cv));
+    this.selectedCv =  this.cvService.selectCv$;
   }
 }
